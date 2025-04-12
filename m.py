@@ -421,7 +421,7 @@ def handle_attack(message):
 
     # ✅ GLOBAL ATTACK CHECK
     if active_attack is not None:
-        bot.reply_to(message, "⚠ EK AUR ATTACK CHAL RAHA HAI! PEHLE WOH FINISH HONE DO.")
+        bot.reply_to(message, "⚠ ATTACK ALREADY RUNNING!! /stats.")
         return
 
     command = message.text.split()
