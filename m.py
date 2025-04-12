@@ -419,6 +419,11 @@ def handle_attack(message):
         bot.reply_to(message, "❌ FREE MAI NHI HAI")
         return
 
+    # ✅ GLOBAL ATTACK CHECK
+    if active_attack is not None:
+        bot.reply_to(message, "⚠ EK AUR ATTACK CHAL RAHA HAI! PEHLE WOH FINISH HONE DO.")
+        return
+
     command = message.text.split()
     if len(command) != 4:
         bot.reply_to(message, "⚠ USAGE: /bgmi <IP> <PORT> <TIME>")
@@ -435,11 +440,6 @@ def handle_attack(message):
 
     if time_duration > MAX_DURATION:
         bot.reply_to(message, f"🚫 MAX ATTACK TIME IS {MAX_DURATION} SECONDS!")
-        return
-
-    # ✅ GLOBAL ATTACK CHECK
-    if active_attack is not None:
-        bot.reply_to(message, "⚠ EK AUR ATTACK CHAL RAHA HAI! PEHLE WOH FINISH HONE DO.")
         return
 
     # ✅ START ATTACK
